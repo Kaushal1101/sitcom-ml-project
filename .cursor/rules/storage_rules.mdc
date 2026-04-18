@@ -1,0 +1,38 @@
+---
+description: Constraints for data architecture, metric types, and storage scalability.
+globs: backend/db/**, data/**, **/schema/**
+---
+
+# Storage & Metrics Strategy (MVP)
+
+## 1. Data Philosophy
+The storage system must be **modular and joinable**. We are dealing with three distinct data "vibrations": static metadata, dynamic social signals, and unstructured narrative text. The architecture must allow these to be merged via a unique identifier per episode.
+
+## 2. Target Metric Categories (MVP)
+The agent should design storage to accommodate the following high-level metrics without requiring a full schema rewrite later:
+
+### A. Performance & Metadata
+- **Identity:** Unique ID, Season/Episode numbering, Series Title.
+- **Success Metrics:** Reliable popularity scores and critic/audience consensus.
+- **Temporal Data:** Original air dates (to track series evolution).
+
+### B. Narrative & Mood Signals (Semantic)
+- **Plot Density:** Quantitative measure of how much happens in an episode.
+- **Emotional Arc:** Tracking the "Vibe" (e.g., Wholesome, Tense, Sad, Chaotic).
+- **Relational Map:** Data points representing which characters drive the story in a specific episode.
+
+### C. Social & "Cringe" Signals (Community)
+- **Engagement Intensity:** Volume of community discussion relative to episode age.
+- **Sentiment Variance:** Difference between critic views and fan discussion.
+- **Cringe-Factor:** Specific metrics capturing social friction or secondhand embarrassment.
+
+## 3. Storage Requirements
+- **Scalability:** Must handle an initial show (e.g., *The Office*) but scale to 50+ shows without performance degradation.
+- **Join-Efficiency:** The primary key (Episode ID) must allow for O(1) or O(log n) lookups when joining metadata with semantic embeddings.
+- **Future-Proofing:** Storage should support "Feature Append" (adding new calculated metrics like 'Rewatchability' or 'Lore-Density' later without breaking existing queries).
+- **Cold/Hot Data Separation:** Ability to separate heavy raw text (Wiki/Reddit) from lightweight ranking scores.
+
+## 4. Agent Instructions
+- Propose a storage architecture that handles both **structured data** (metrics) and **unstructured data** (for RAG/Vector search).
+- Ensure the data ingestion pipeline handles "Partial Upserts"—if we scrape Reddit today and Wiki tomorrow, the episode record should merge, not overwrite.
+- Prioritize data integrity: No duplicate episodes, and handle missing values gracefully (especially for scraped social metrics).

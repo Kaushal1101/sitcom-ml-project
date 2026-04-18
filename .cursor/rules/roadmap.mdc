@@ -1,0 +1,22 @@
+---
+description: Phases, next steps, planning
+alwaysApply: false
+---
+# Execution Roadmap
+
+## Phase 1: MVP (Retrieval)
+- Scrape TMDB/IMDB for baseline metadata.
+- Build basic ChromaDB vector store using episode overviews.
+- Implementation of simple Cosine Similarity search.
+
+## Phase 2: Intermediate (Engineering)
+- Scrape Fandom Wiki and Reddit comments for "social signals."
+- **Feature Engineering:** Create columns for `Cringe-Index`, `Wholesome-Score`, and `Relational-Density`.
+- Apply **Bayesian Smoothing** to episode ratings.
+
+## Phase 3: Advanced (FAANG Architect)
+- **Two-Tower Architecture:** Separate Retrieval and Ranking stages.
+- **Mathematical Scoring:** Implement Multi-Criteria Decision Making (MCDM).
+- **Diversity:** Apply Determinantal Point Processes (DPP) or MMR to ensure the top 5 results aren't from the same season/show.
+
+**Current Task:** Refer to the root `AGENTS.md` for the active phase.

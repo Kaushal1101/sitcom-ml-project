@@ -1,0 +1,19 @@
+---
+alwaysApply: true
+---
+# Project: Mood-Moment Recommender
+
+## Core Goal
+An AI-driven recommendation engine that suggests specific TV episodes (The Office, Friends, etc.) based on complex, natural-language user moods (e.g., "Slightly sad but wholesome").
+
+## Tech Stack
+- **Language:** Python 3.11+
+- **Orchestration:** DSPy (for prompt optimization and logic)
+- **Vector DB:** ChromaDB (for semantic retrieval)
+- **Data:** Scraped Wiki text, Reddit discussions, and IMDB metadata
+- **Models:** Local Ollama (Llama 3/Mistral) and Sentence-Transformers
+
+## Guardrails
+- Avoid generic "MovieLens" style recommendations. 
+- Prioritize **Semantic Meaning** over simple keyword matching.
+- Always assume the user wants an episode that fits a "vibe" or "emotional state."

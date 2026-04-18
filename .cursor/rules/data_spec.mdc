@@ -1,0 +1,23 @@
+---
+description: Data schema and mathematical ranking requirements
+globs: **/data/*.csv, **/scripts/*.py
+---
+
+# Data Schema & Ranking Logic
+
+## Master Episode Table Structure
+Every row is a single episode. Mandatory columns:
+- `episode_id`: unique string (e.g., "office_s04_e13")
+- `semantic_vector`: 384-dim or 768-dim embedding
+- `cringe_score`: float (0-1) derived from Reddit sentiment
+- `happiness_score`: float (0-1) derived from Zero-Shot classification
+- `bayesian_rating`: float (0-10) adjusted for vote count
+
+## Mathematical Standards
+- **Normalization:** All feature scores must be Min-Max scaled to [0, 1].
+- **Ranking Formula:** $Score = \sum (w_i \cdot f_i)$
+- **Similarity:** Use Cosine Similarity for the initial retrieval stage.
+
+## Extraction Rules
+- When scraping Wiki summaries, preserve spoilers; they are vital for mood detection.
+- Filter Reddit comments for "high-intensity" words to calculate social vibes.

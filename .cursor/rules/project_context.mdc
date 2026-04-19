@@ -8,9 +8,11 @@ An AI-driven recommendation engine that suggests specific TV episodes (The Offic
 
 ## Tech Stack
 - **Language:** Python 3.11+
-- **Orchestration:** DSPy (for prompt optimization and logic)
-- **Vector DB:** ChromaDB (for semantic retrieval)
-- **Data:** Scraped Wiki text, Reddit discussions, and IMDB metadata
+- **Structured store:** SQLite (MVP) via SQLAlchemy + Alembic; `DATABASE_URL` or `SQLITE_PATH` in `.env`. Episode-level cold text (wiki + unified JSON) in **`episode_source_document`** for retrieval and RAG-style use later.
+- **Data pipeline (Phase 1):** **LangGraph** — `python -m backend.pipeline` runs scrape → SQLite ingest (`backend/pipeline`, `backend/scraping/runner.py`, `backend/ingestion/wiki_sqlite.py`).
+- **Orchestration (product logic):** DSPy (prompt optimization and recommendation logic)
+- **Retrieval (roadmap):** Vector store + embeddings over wiki-backed text (`backend.retrieval.embedding_text`)
+- **Data:** Scraped Fandom wiki text (Phase 1 pilot); optional future social/metadata sources
 - **Models:** Local Ollama (Llama 3/Mistral) and Sentence-Transformers
 
 ## Guardrails

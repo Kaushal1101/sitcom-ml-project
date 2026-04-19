@@ -1,0 +1,29 @@
+---
+alwaysApply: false
+---
+# Orchestration & Coordination Logic
+
+## 1. The "Single Source of Truth" (SSOT)
+The Orchestrator must ensure all sub-agents (Scraper, Storage, UI) adhere to:
+- **`DATA_SPEC.mdc`**: For naming conventions and data types.
+- **`ROADMAP.mdc`**: To prevent "feature creep" beyond the current Phase.
+- **`AGENTS.md`**: To track which agent owns which file.
+
+## 2. Handoff Protocols
+When a sub-agent completes a task, the Orchestrator must:
+- **Verify Output:** Ensure the Scraper's JSON matches the Storage Agent's expected input schema.
+- **State Update:** Automatically update `AGENTS.md` with the new "Current State."
+- **Project log:** Ensure a new entry is appended to **`docs/PROJECT_LOG.md`** (newest-first) so other agents see what changed and how it was verified.
+- **Dependency Check:** Before starting a Phase 2 task, verify that all Phase 1 dependencies are committed and functional.
+
+## 3. Conflict Resolution (The "Tie-Breaker")
+- If the **Scraper Agent** wants to change a field name, the Orchestrator must approve it only if it doesn't break the **Ranking Engine**.
+- If two agents attempt to edit the same file (e.g., `main.py`), the Orchestrator must lock the file and force a sequential edit.
+
+## 4. Agent Instructions
+- **Think Before Coding:** When asked to start a task, scan the entire `@Codebase` first to identify cross-module impacts.
+- **Modularization:** Enforce a "Decoupled" architecture. If a Scraper Agent tries to import a Database library, flag it as a violation of concerns.
+- **Project Pulse:** Periodically (every 5-10 messages) summarize the "Delta" (what has changed) and how it affects the `ROADMAP.mdc`.
+
+## 5. Global Constraint
+- **No Hardcoding:** Ensure no agent hardcodes IDs or paths. Everything must be referenced via config or environment variables.

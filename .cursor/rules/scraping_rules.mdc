@@ -1,33 +1,59 @@
 ---
-description: Logic for multi-source data extraction, rate limiting, and output formatting.
-globs: scripts/scrapers/**, **/ingestion/**
+description: Dunderpedia-only scraping; extracted_data.json contract; pipeline entry points.
+globs: backend/scraping/**, backend/pipeline/**
+alwaysApply: false
 ---
+# Scraping (Dunderpedia-only)
 
-# Scraping Protocol (Phase 1)
+**Scope:** Single source for this slice is **Dunderpedia** (The Office US Fandom wiki), fetched via the Fandom **MediaWiki parse API** (same article HTML as the wiki; avoids naive `/wiki/` browser challenges).
 
-## 1. Source-Specific Logic
-The agent must implement handlers for the following four pillars:
+## Episode paths
 
-- **IMDb/TMDB:** Primary source for official metadata (ID, Air Date, Ratings). Prioritize API usage (TMDB) over head-less scraping where possible.
-- **Fandom Wiki:** Primary source for narrative depth. Extract 'Plot', 'Trivia', and 'Cast' sections. Handle inconsistent HTML structures across different show wikis.
-- **Reddit:** Primary source for social signals. Target 1-3 highly active threads per episode (e.g., "Official Discussion Threads"). 
-- **Validation:** Every episode must be mapped to a canonical ID (e.g., `THE_OFFICE_S02_E04`) to ensure cross-source alignment.
+Output lives under `data/raw/{episode_id}/` where:
 
-## 2. Scraping Safety & Ethics
-- **Rate Limiting:** Implement randomized delays (jitter) between requests. 
-- **User-Agents:** Use rotate-able, modern User-Agent strings.
-- **Error Handling:** Gracefully handle 403 (Forbidden) and 404 (Not Found) errors. If a Reddit thread is missing, log it and proceed with Wiki/IMDb data.
-- **Caching:** Save raw HTML/JSON responses locally during development to avoid redundant network calls.
+`episode_id = make_episode_id(series_slug, season, episode)`
 
-## 3. Output Requirements
-For the initial test (The Office S02E04), the agent must produce:
-- **Raw Data:** One folder per episode containing the raw `.txt` or `.html` from each source.
-- **Unified JSON:** A single `extracted_data.json` containing:
-    - `metadata`: Titles, ratings, air dates.
-    - `narrative`: Full text of the plot and trivia.
-    - `social`: A list of top Reddit comments (text only).
+See `backend/scraping/episode_ref.py` and `backend/db/repositories.py`.
 
-## 4. Agent Instructions
-- **Start Small:** Begin by scraping ONLY **The Office S02E04 (The Fire)**.
-- **Show Evidence:** After the scrape, print a summary of the character count for the plot and the number of Reddit comments retrieved.
-- **Scalability:** Write the code using a "Provider Pattern" (e.g., a `WikiProvider` class) so we can add new shows or sources easily in Phase 2.
+## Episode registry
+
+The LangGraph pipeline resolves `episode_id` → `EpisodeRef` via **`ref_for_episode_id()`** and **`_EPISODE_REGISTRY`** in `episode_ref.py`. Add a new `EpisodeRef` and register it before scraping a new episode.
+
+## Scrape entry points (no standalone `python -m backend.scraping`)
+
+- **Programmatic:** `run_scrape_for_ref(ref, data_root)` in **`backend/scraping/runner.py`** — writes raw caches + `extracted_data.json`, returns summary (narrative evidence, optional text previews for the graph).
+- **CLI (full pipeline):** **`python -m backend.pipeline`** — LangGraph linear graph: scrape node → ingest node (`backend/pipeline/graph.py`). Default pilot: `the_office_s02_e04`. Flags: `--episode-id`, `--pilot`, `--skip-scrape`, `--skip-ingest`, `--json`.
+- **Scrape only:** `python -m backend.pipeline --skip-ingest`
+- **Ingest only:** `python -m backend.pipeline --skip-scrape` (raw folder must already exist)
+
+There is **no** `backend/scraping/__main__.py`; do not document `python -m backend.scraping`.
+
+## Downstream ingest (boundary)
+
+SQLite load from `data/raw/{episode_id}/` is **`ingest_raw_dir()`** in **`backend/ingestion/wiki_sqlite.py`** (series/episode + `episode_source_document` rows for wiki text and full unified JSON). Not part of the scraper package, but defines the contract for on-disk output.
+
+## `extracted_data.json` contract
+
+Assembler: `build_extracted_data` in `backend/scraping/extracted_data.py`.
+
+| Root key | Contents |
+|----------|----------|
+| `episode_id` | Same as directory name and `metadata.episode_id`. |
+| `metadata` | Wiki-sourced: `episode_id`, `series_title`, `series_slug`, `episode_title` (wiki page title), `season_number`, `episode_number`, `air_date` (infobox when parsed), compact `provenance` (`source: dunderpedia_fandom`, field-level hints). No TMDB or ratings placeholders. |
+| `narrative` | `plot` (Dunderpedia: Cold_open + Summary), `plot_sections_used`, `trivia`, optional `cast_text_debug`, `lede_text`. |
+| `social` | Stub for ingest compatibility: `{"comments": [], "social_status": "not_used_wiki_only"}`. |
+
+## Raw caches (same folder)
+
+- `wiki_parse_api.json` — full API response
+- `wiki_article_from_api.html` — article HTML fragment
+- `wiki_extracted.json` — parsed sections + infobox/lede
+
+## Safety
+
+- Randomized delays (jitter), rotating User-Agents, graceful 403/404; persist raw JSON/HTML during development to avoid repeat fetches.
+
+## Provider pattern
+
+- `DunderpediaWikiProvider` / `fetch_dunderpedia_article` in `backend/scraping/providers/wiki_fandom.py`
+- HTTP helpers in `backend/scraping/http_client.py`

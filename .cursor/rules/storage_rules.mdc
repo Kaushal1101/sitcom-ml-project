@@ -1,38 +1,54 @@
 ---
-description: Constraints for data architecture, metric types, and storage scalability.
-globs: backend/db/**, data/**, **/schema/**
+description: Storage architecture, SQLite schema, wiki-first ingestion.
+globs: backend/**, backend/ingestion/**, backend/pipeline/**, backend/retrieval/**, alembic/**, data/**
+alwaysApply: false
 ---
-
 # Storage & Metrics Strategy (MVP)
 
 ## 1. Data Philosophy
-The storage system must be **modular and joinable**. We are dealing with three distinct data "vibrations": static metadata, dynamic social signals, and unstructured narrative text. The architecture must allow these to be merged via a unique identifier per episode.
+The storage system must be **modular and joinable**. We combine static metadata, future social signals, and unstructured narrative text, merged via a unique **`episode_id`** per episode.
 
 ## 2. Target Metric Categories (MVP)
-The agent should design storage to accommodate the following high-level metrics without requiring a full schema rewrite later:
+Design storage so these can land without a full schema rewrite later:
 
 ### A. Performance & Metadata
-- **Identity:** Unique ID, Season/Episode numbering, Series Title.
-- **Success Metrics:** Reliable popularity scores and critic/audience consensus.
-- **Temporal Data:** Original air dates (to track series evolution).
+- **Identity:** Unique ID, season/episode numbering, series title.
+- **Success Metrics:** Popularity / consensus (when sourced).
+- **Temporal Data:** Air dates.
 
 ### B. Narrative & Mood Signals (Semantic)
-- **Plot Density:** Quantitative measure of how much happens in an episode.
-- **Emotional Arc:** Tracking the "Vibe" (e.g., Wholesome, Tense, Sad, Chaotic).
-- **Relational Map:** Data points representing which characters drive the story in a specific episode.
+- **Plot density, emotional arc, relational map** — from narrative text and structured links (`episode_character`).
 
-### C. Social & "Cringe" Signals (Community)
-- **Engagement Intensity:** Volume of community discussion relative to episode age.
-- **Sentiment Variance:** Difference between critic views and fan discussion.
-- **Cringe-Factor:** Specific metrics capturing social friction or secondhand embarrassment.
+### C. Social & Community (future)
+- Engagement, sentiment variance, “cringe”-style features — optional columns or feature tables later.
 
 ## 3. Storage Requirements
-- **Scalability:** Must handle an initial show (e.g., *The Office*) but scale to 50+ shows without performance degradation.
-- **Join-Efficiency:** The primary key (Episode ID) must allow for O(1) or O(log n) lookups when joining metadata with semantic embeddings.
-- **Future-Proofing:** Storage should support "Feature Append" (adding new calculated metrics like 'Rewatchability' or 'Lore-Density' later without breaking existing queries).
-- **Cold/Hot Data Separation:** Ability to separate heavy raw text (Wiki/Reddit) from lightweight ranking scores.
+- **Scalability:** One show first; must scale to many series without degrading lookups.
+- **Join-efficiency:** **`episode_id`** is the primary join key for hot metadata, cold text, and downstream embeddings.
+- **Feature append:** New scores (e.g. rewatchability) via new columns or `episode_features`-style tables.
+- **Cold/hot separation:** Heavy wiki/unified blobs in **`episode_source_document`**; lightweight fields on **`episode`**.
 
-## 4. Agent Instructions
-- Propose a storage architecture that handles both **structured data** (metrics) and **unstructured data** (for RAG/Vector search).
-- Ensure the data ingestion pipeline handles "Partial Upserts"—if we scrape Reddit today and Wiki tomorrow, the episode record should merge, not overwrite.
-- Prioritize data integrity: No duplicate episodes, and handle missing values gracefully (especially for scraped social metrics).
+## 4. Relational schema (SQLite, wiki-first MVP)
+- **`series`:** `id` = **`series_{slug}`** (e.g. `series_the_office`), plus `slug`, `title`, optional **`tmdb_tv_id`** (nullable, not unique — external reference only if present in scraped metadata).
+- **`episode`:** **`episode_id`** global key (e.g. `the_office_s02_e04`). Unique per `(series_id, season_number, episode_number)` and per `(series_id, tmdb_episode_id)` when `tmdb_episode_id` is non-null.
+- **`character` / `episode_character`:** Many-to-many cast; optional `tmdb_person_id` on character for future enrichment. Authoritative cast remains relational.
+- **`episode_source_document`:** `source` ∈ **`wiki`** | **`unified`**. Composite PK `(episode_id, source)`.
+
+**Implementation (code map):**
+- **Ingest (disk → SQLite):** `backend/ingestion/wiki_sqlite.py` — `ingest_raw_dir(episode_id, raw_dir)` reads `data/raw/{episode_id}/extracted_data.json` or `wiki_extracted.json`.
+- **Core upserts & episode_id helpers:** `backend/db/repositories.py` — `upsert_series`, `upsert_episode`, `upsert_episode_source_document`, `series_id_wiki`, `make_episode_id`, `parse_episode_id`, plus `SOURCE_WIKI` / `SOURCE_UNIFIED`.
+- **Character / cast (optional for wiki-only):** `backend/db/character_repo.py` — not called by default ingest; use when populating cast from a future source.
+- **Embedding / RAG string:** `backend/retrieval/embedding_text.py` — `episode_embedding_text`, `get_episode_source_document`.
+- **Orchestration:** `backend/pipeline/` — LangGraph scrape → ingest; CLI **`python -m backend.pipeline`** (depends on **`langgraph`** in `pyproject.toml`). The scrape node resolves `episode_id` via `ref_for_episode_id` in `backend/scraping/episode_ref.py` (`_EPISODE_REGISTRY`); register new episodes there before full pipeline scrape, or use **`--skip-scrape`** when raw JSON already exists.
+
+**Migrations:** `alembic/versions/001_initial_schema.py`, `002_episode_source_document.py`, `003_wiki_only_series_tmdb_nullable.py`.
+
+## 5. Agent Instructions
+- Support **partial upserts**: wiki ingest must not wipe unrelated `episode` fields; each document source replaces only its `(episode_id, source)` row.
+- Prefer **one command path**: **`python -m backend.pipeline`** runs scrape → ingest and populates `series`, `episode`, and wiki/unified documents (no API keys required for storage).
+- **Direct ingest:** You may call **`ingest_raw_dir`** in `backend/ingestion/wiki_sqlite.py` without the graph (same logic as the pipeline ingest node) for tests or custom tooling.
+- Preserve **data integrity**: no duplicate episodes; nullable external ids where sources omit them.
+
+### Stack note
+- **SQLite + SQLAlchemy + Alembic** are the persistence stack; `pyproject.toml` includes **`langgraph`** for the pipeline only.
+- **Not** in dependencies: `chromadb`, `requests` (no TMDB/API HTTP client in-tree). Do **not** document obsolete top-level **`scripts/ingestion`** paths — ingestion lives under **`backend/ingestion/`**.

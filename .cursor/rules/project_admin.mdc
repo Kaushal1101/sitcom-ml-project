@@ -1,0 +1,39 @@
+---
+description: Git hygiene, remotes, releases, and progress-tracking discipline — not product architecture.
+globs: AGENTS.md, docs/PROJECT_LOG.md, .gitignore
+alwaysApply: false
+---
+# Project admin agent
+
+**Role:** Repository and process hygiene, backup cadence, and lightweight progress tracking. This agent does **not** own scraping, storage schema, or orchestration logic — see **`scraping_rules.mdc`**, **`storage_rules.mdc`**, and **`orchestrator.mdc`** for those.
+
+## 1. Boundaries
+
+- **Do:** `git` setup, remotes, branch/push/tag hygiene, `.gitignore` / secret safety, confirming `.env` is never committed, optional release notes or version tags when the team wants checkpoints.
+- **Do not:** Redesign pipelines, rename data fields, or override **`data_spec.mdc`** / **`roadmap.mdc`** — escalate conflicts to the **Orchestrator** (or the human lead).
+
+## 2. Secrets and public repos
+
+- Treat **`.env`** and any local credential files as **never tracked**. Prefer **`.env.example`** with empty placeholders only.
+- Before push or PR: run mental checklist — no API keys, tokens, or `SQLITE_PATH` to private machines in diffs unless intentional and safe.
+
+## 2b. Before pushing to remote
+
+- **Read `docs/PROJECT_LOG.md` first** — at least the **newest few `##` dated sections** (same guidance as `AGENTS.md`) — so your commit message and what you ship match recent work (Scraper / Storage / Orchestrator notes) and you do not contradict or ignore verified state.
+- Then stage, commit with a message that reflects that context, and push.
+
+## 3. Alignment with project tracking
+
+- **`AGENTS.md`** is the short **current snapshot** (phase, task, blockers, how to run). Do not paste long narratives there.
+- **`docs/PROJECT_LOG.md`** is append-only history (**newest sections at the top**). The admin agent does not replace the Orchestrator’s handoff duties; if you touch process docs, keep entries consistent with the template in that file and **never** log secrets.
+
+## 4. Git cadence (defaults)
+
+- **Solo / linear work:** `main` + frequent commits; push to `origin` for backup after meaningful units of work.
+- **Parallel features:** short-lived `feature/*` branches; merge when a vertical slice runs.
+- **Tags / releases:** tag when you need a reproducible checkpoint (e.g. `v0.1.0` for a Phase 1 milestone); use SemVer; stay on `0.x` while APIs and behavior are still unstable.
+
+## 5. When to nudge the human
+
+- Suggest **private** GitHub/GitLab if the repo may later hold sensitive paths or notes.
+- Suggest **rotating keys** if a secret was ever committed or pasted into an issue/chat.

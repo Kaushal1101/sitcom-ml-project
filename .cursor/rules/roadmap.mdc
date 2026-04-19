@@ -4,19 +4,24 @@ alwaysApply: false
 ---
 # Execution Roadmap
 
-## Phase 1: MVP (Retrieval)
-- Scrape TMDB/IMDB for baseline metadata.
-- Build basic ChromaDB vector store using episode overviews.
-- Implementation of simple Cosine Similarity search.
+## Phase 1: MVP (Wiki-first ingestion)
+
+- **Scrape:** Dunderpedia (Fandom) → `data/raw/{episode_id}/` + `extracted_data.json`, driven by **`backend/scraping/runner.py`** (`run_scrape_for_ref`) and **`backend/scraping/providers/wiki_fandom.py`**.
+- **Orchestration:** **LangGraph** linear pipeline **`python -m backend.pipeline`** (`backend/pipeline/graph.py`: scrape → ingest). Dependencies: `langgraph` (see `pyproject.toml` / `requirements.txt`).
+- **SQLite:** `series` (`series_{slug}` via `series_id_wiki`), `episode`, cold text in **`episode_source_document`** (wiki-derived narrative + full unified JSON blob). Ingest: **`backend/ingestion/wiki_sqlite.py`** (`ingest_raw_dir`).
+- **Retrieval prep:** `episode_embedding_text()` in **`backend/retrieval/embedding_text.py`** (episode fields + wiki/unified docs).
+- **Later in Phase 1 (optional):** vector store + cosine search over that text (not required for scrape/ingest today).
 
 ## Phase 2: Intermediate (Engineering)
-- Scrape Fandom Wiki and Reddit comments for "social signals."
-- **Feature Engineering:** Create columns for `Cringe-Index`, `Wholesome-Score`, and `Relational-Density`.
-- Apply **Bayesian Smoothing** to episode ratings.
+
+- Extra metadata sources (e.g. TMDB/API) and social signals if product needs them.
+- **Feature engineering:** optional columns or tables for mood-oriented scores (`Cringe-Index`, wholesome, relational-density, etc.).
+- **Ratings:** Bayesian or robust scores when vote data exists.
 
 ## Phase 3: Advanced (FAANG Architect)
-- **Two-Tower Architecture:** Separate Retrieval and Ranking stages.
-- **Mathematical Scoring:** Implement Multi-Criteria Decision Making (MCDM).
-- **Diversity:** Apply Determinantal Point Processes (DPP) or MMR to ensure the top 5 results aren't from the same season/show.
 
-**Current Task:** Refer to the root `AGENTS.md` for the active phase.
+- **Two-Tower Architecture:** Separate Retrieval and Ranking stages.
+- **Mathematical Scoring:** Multi-Criteria Decision Making (MCDM).
+- **Diversity:** Determinantal Point Processes (DPP) or MMR so top results are not all from the same season/show.
+
+**Current task:** See root `AGENTS.md` for the active slice.

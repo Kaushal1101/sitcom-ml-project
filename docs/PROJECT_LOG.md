@@ -10,6 +10,8 @@ Do not put secrets or `.env` contents here.
 
 **Summary:** Repository sync to `origin`: Phase 1 wiki-first stack already described below (LangGraph `python -m backend.pipeline`, Dunderpedia runner, Alembic/SQLite, rules). Added **`project_admin.mdc`** requirement: read the newest sections of this file before any remote **push** so commits match verified agent work.
 
+**Commit:** `f789967`
+
 **Verification:** `git log -1 --oneline` after push; smoke checks in `AGENTS.md`.
 
 ---
